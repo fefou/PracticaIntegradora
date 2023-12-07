@@ -1,0 +1,16 @@
+<h2>PRODUCTOS</h2>
+<hr>
+
+<script src="socket.io/socket.io.js"></script>
+<script src="js/ws.js"></script>
+
+<div>
+    {{#each productos}}
+    <p>{{this.title}}</p>
+    <p>{{this.price}}</p>
+    <hr>
+    {{/each}}
+</div>
+
+<br></br>
+<a href="/">Home Page</a>
