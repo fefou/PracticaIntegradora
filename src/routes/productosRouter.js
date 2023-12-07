@@ -28,7 +28,7 @@ function saveProducts(productos) {
 routerP.get('/',async (req, res) => {
 let productos=[]
     try {
-        productos = await productsModelo.find({})        
+        productos = await productsModelo.find({deleted:false})        
     } catch (error) {
         console.log(error.message)
     }
@@ -74,23 +74,24 @@ routerP.post('/', async(req, res) => {
         return res.status(400).json({ error: `Title, price, code, stock y category son datos obligatorios.` });
     }
 
+    let existe=false
+    try {        
+        existe = await productsModelo.findOne({deleted:false, title, code});
+    } catch (error) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(500).json({ error: `Error al buscar producto`, message: error.message });
+    }
+
+    if (existe) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(400).json({ error: `El titulo ${title} o codigo ${code} ya existe en BD` });
+    }
     
     try {
-        let productos = await productsModelo.create({title, description, price, code, stock, category});
-
-        // let existe = productos.find(producto => producto.title === title || producto.code === code);
-        // if (existe) {
-        //     res.setHeader('Content-Type', 'application/json');
-        //     return res.status(400).json({ error: `El titulo ${title} o codigo ${code} ya existe en BD` });
-        // }
-    
-        let id = 1;
-        if (productos.length > 0) {
-            id = productos[productos.length - 1].id + 1;
-        }
-    
+    let productos = await productsModelo.create({title, description, price, code, stock, category});
+           
         let nuevoProducto = {
-            id, title, description, price, code, stock, status, thumbnails
+            title, description, price, code, stock, status, thumbnails
         };
     
         serverSockets.emit("productos", productos)
