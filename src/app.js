@@ -29,7 +29,7 @@ app.get('/', (req, res) => {
 })
 
 
-app.use('/api/productos', productosRouter)
+app.use('/api/products', productosRouter)
 app.use('/api/carts', carritoRouter)
 app.use('/', vistasRouter)
 

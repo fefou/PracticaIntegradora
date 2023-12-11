@@ -13,6 +13,7 @@ import path from 'path'
 import __dirname from '../utils.js'
 import { serverSockets } from '../app.js'
 import { productsModelo } from '../dao/models/products.model.js'
+import mongoose from 'mongoose'
 
 const routerP = Router()
 let ruta = path.join(__dirname, 'json', 'productos.json')
@@ -43,22 +44,27 @@ let productos=[]
 
 routerP.get('/:id',async (req, res) => {
 
-    let id = req.params.id
-    // console.log(id, 2)
-    id = parseInt(id)
-    if (isNaN(id)) {
-        return res.send('Error, ingrese un argumento id numerico')
-    }
-
-    try {
-        const resultado = await productsModelo.find(per => per.id === id)
-
+    let {id} = req.params
+    if(!mongoose.isValidObjectId(id)){
         res.setHeader('Content-Type', 'application/json');
-        res.status(200).json({ resultado });
-
-    } catch (error) {
-        console.log(`No se encontro un usuario con id ${id}`, error.message);
+        return res.status(400).json({ error: `Indique un id válido` });
     }
+    
+    let existe
+    try {
+        existe = await productsModelo.findOne({deleted:false, _id:id})
+    } catch (error) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(500).json({ error: `Error al buscar producto`, message: error.message });
+    }
+
+    if (!existe) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(400).json({ error: `No existe producto con id ${id}` });
+    }
+
+    res.setHeader('Content-Type', 'application/json');
+    return res.status(200).json({ usuario:existe });
 })
 
 
@@ -71,7 +77,7 @@ routerP.post('/', async(req, res) => {
 
     if (!title || !price || !code || !stock || !category) {
         res.setHeader('Content-Type', 'application/json');
-        return res.status(400).json({ error: `Title, price, code, stock y category son datos obligatorios.` });
+        return res.status(400).json({ error: `title, price, code, stock y category son datos obligatorios.` });
     }
 
     let existe=false
@@ -109,80 +115,97 @@ routerP.post('/', async(req, res) => {
 
 routerP.put('/:id',async (req, res) => {
 
-    let { id } = req.params
-    id = parseInt(id)
-    if (isNaN(id)) {
+    let {id} = req.params
+    if(!mongoose.isValidObjectId(id)){
         res.setHeader('Content-Type', 'application/json');
-        res.status(400).json({ error: `Indique un id numérico` });
+        return res.status(400).json({ error: `Indique un id válido` });
     }
-
     
-    let productos = await productsModelo.find({})
-    let indiceProducto = productos.findIndex(producto => producto.id === id)
-    if (indiceProducto === -1) {
+    let existe
+    try {
+        existe = await productsModelo.findOne({deleted:false, _id:id})
+    } catch (error) {
         res.setHeader('Content-Type', 'application/json');
-        return res.status(400).json({ error: `No existen productos con id ${id}` });
+        return res.status(500).json({ error: `Error al buscar producto`, message: error.message });
     }
 
-
-    let propsPermitidas = ["title", "description", "price", "code", "stock", "thumbnails"]
-
-    let propsQueLlegan = Object.keys(req.body)
-    let valido = propsQueLlegan.every(propiedad => propsPermitidas.includes(propiedad))
-
-    if (!valido) {
-        res.setHeader('Content-Type', 'application.json')
-        return res.status(400).json({ error: `No se aceptan algunas props`, propsPermitidas })
+    if (!existe) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(400).json({ error: `No existe producto con id ${id}` });
     }
 
-    let productoModificado = {
-        ...productos[indiceProducto],
-        ...req.body,
-        id
+    if(req.body._id){
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(400).json({ error: `No se puede modificar el id` });
     }
 
-    productos[indiceProducto] = productoModificado
+    let resultado
+    try {
+        resultado=await productsModelo.updateOne({deleted:false, _id:id},req.body)
+        console.log(resultado)
 
-    saveProducts(productos)
+        if (resultado.modifiedCount>0){
+            res.setHeader('Content-Type', 'application/json');
+            return res.status(200).json({ payload:"modificación realizada" });
 
+        }else{
+            res.setHeader('Content-Type', 'application/json');
+            return res.status(200).json({ message:"No se modificó ningún producto" });
+        }
 
-    res.setHeader('Content-Type', 'application/json');
-    res.status(200).json({
-        productoModificado
-    });
+    } catch (error) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(500).json({ error: `Error inesperado`, message: error.message });
+    }
+
 });
 
 
 // DELETE 
 
-routerP.delete('/:id', (req, res) => {
+routerP.delete('/:id',async (req, res) => {
 
     let { id } = req.params
-    id = parseInt(id)
-    if (isNaN(id)) {
+
+    if(!mongoose.isValidObjectId(id)){
         res.setHeader('Content-Type', 'application/json');
-        res.status(400).json({ error: `Indique un id numérico` });
+        return res.status(400).json({ error: `Indique un id válido` });
+    }
+    
+    let existe
+    try {
+        existe = await productsModelo.findOne({deleted:false, _id:id})
+    } catch (error) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(500).json({ error: `Error al buscar producto`, message: error.message });
     }
 
-    let productos = productosJSON
-    let indiceProducto = productos.findIndex(producto => producto.id === id)
-    if (indiceProducto === -1) {
+    if (!existe) {
         res.setHeader('Content-Type', 'application/json');
-        return res.status(400).json({ error: `No existen productos con id ${id}` });
+        return res.status(400).json({ error: `No existe producto con id ${id}` });
     }
 
-    let productoEliminado = productos.splice(indiceProducto, 1)
+    let resultado
+    try {
+        resultado=await productsModelo.updateOne({deleted:false, _id:id},{$set:{deleted:true}})
+        console.log(resultado)
 
-    saveProducts(productos)
+        if (resultado.modifiedCount>0){
+            res.setHeader('Content-Type', 'application/json');
+            return res.status(200).json({ payload:"Producto Eliminado" });
 
-    res.setHeader('Content-Type', 'application/json');
-    res.status(200).json({
-        productoEliminado
-    });
+        }else{
+            res.setHeader('Content-Type', 'application/json');
+            return res.status(200).json({ message:"No se eliminó ningún producto" });
+        }
+
+    } catch (error) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(500).json({ error: `Error inesperado`, message: error.message });
+    }
+
+
 });
-
-
-
 
 
 export default routerP

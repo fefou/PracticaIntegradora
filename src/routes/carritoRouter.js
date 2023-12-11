@@ -1,12 +1,3 @@
-// const { Router } = require('express')
-// const routerC = Router()
-// const carritosJSON = require('../json/carritos.json')
-// const productosJSON = require('../json/productos.json')
-// const fs = require('fs')
-// const path = require('path')
-// let ruta = path.join(__dirname, '..', 'json', 'carritos.json')
-
-// ahora en vez de importar con const importamos con import
 import { Router } from 'express'
 import carritosJSON from '../json/carritos.json' assert { type: "json" }
 import productosJSON from '../json/productos.json' assert { type: "json" }
@@ -15,110 +6,125 @@ import path from 'path'
 import __dirname from '../utils.js'
 const routerC = Router()
 let ruta = path.join(__dirname, '..', 'json', 'carritos.json')
-
-
+import mongoose from 'mongoose'
+import { cartsModelo } from '../dao/models/carts.model.js'
+import { productsModelo } from '../dao/models/products.model.js'
 function saveProducts(carritos) {
     fs.writeFileSync(ruta, JSON.stringify(carritos, null, 5))
 }
 
 // GET CARRITO
 
-routerC.get('/', (req, res) => {
-    let resultado = carritosJSON
-
-    if (req.query.limit) {
-        resultado = resultado.slice(0, req.query.limit)
+routerC.get('/', async (req, res) => {
+    let carritos = []
+    try {
+        carritos = await cartsModelo.find({ deleted: false }).populate('products.products')
+    } catch (error) {
+        console.log(error.message)
     }
+    res.status(200).json({ carritos });
 
-    res.setHeader('Content-Type', 'application/json');
-    res.status(200).json({ filtros: req.query, resultado });
 });
 
-routerC.get('/:cid', (req, res) => {
+routerC.get('/:cid', async (req, res) => {
 
-    let cid = req.params.cid
-    // console.log(id, 2)
-    cid = parseInt(cid)
-    if (isNaN(cid)) {
-        return res.send('Error, ingrese un argumento id numerico')
+    let { cid } = req.params
+    if (!mongoose.isValidObjectId(cid)) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(400).json({ error: `Indique un id válido` });
     }
 
+    let existe
+    try {
+        existe = await cartsModelo.findOne({ deleted: false, _id: cid })
+    } catch (error) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(500).json({ error: `Error al buscar carrito`, message: error.message });
+    }
 
-    resultado = carritosJSON.find(per => per.cid === cid)
+    if (!existe) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(400).json({ error: `No existe carrito con id ${cid}` });
+    }
 
     res.setHeader('Content-Type', 'application/json');
-    res.status(200).json({ resultado });
+    return res.status(200).json({ carrito: existe });
 })
 
-// POST CARRITO con id y array de productos vacio
+// POST CARRITO VACÍO con id
 
-routerC.post('/', (req, res) => {
-    let carritos = carritosJSON;
+routerC.post('/', async (req, res) => {
+    let carrito = []
 
-    let id = 1;
-    if (carritos.length > 0) {
-        id = carritos[carritos.length - 1].id + 1;
+    try {
+        carrito = await cartsModelo.create({ productsModelo: [] })
+    } catch (error) {
+        console.log("no se pudo crear un carrito", error.message)
     }
-
-    let productos = [];
-    
-    let nuevoCarrito = {
-        id, productos
-    };
-
-    carritos.push(nuevoCarrito);
-    saveProducts(carritos);
-
     res.setHeader('Content-Type', 'application/json');
-    return res.status(201).json({ nuevoCarrito });
+    res.status(201).json({ carrito });
 
 })
 
-//  POST CARRITO con id y array de productos con un producto
+// 65767deca82549cce38c3cec - id del carrito creado
+// 657129cbe743b59b019b8c8b - id del primer producto
 
-routerC.post('/:cid/productos/:pid', (req, res) => {
 
-    let cid = req.params.cid
-    let pid = req.params.pid
-    // console.log(id, 2)
-    cid = parseInt(cid)
-    pid = parseInt(pid)
-    if (isNaN(cid) || isNaN(pid)) {
-        return res.send('Error, ingrese un argumento id numerico')
+// PUT CARRITO - Añadir un producto al carrito creado
+routerC.put('/:cid/products/:pid', async (req, res) => {
+
+    let { cid, pid } = req.params
+    if (!mongoose.isValidObjectId(cid) || !mongoose.isValidObjectId(pid)) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(400).json({ error: `Indique un id válido` });
     }
 
-    let carritos = carritosJSON;
-    let productos = productosJSON;
-
-    let carrito = carritos.find(carrito => carrito.id === cid);
-    let producto = productos.find(producto => producto.id === pid);
-
-    if (!carrito) {
-        return res.status(404).json({ error: `No existe el carrito con id ${cid}` });
+    let existeCarrito
+    try {
+        existeCarrito = await cartsModelo.findOne({ deleted: false, _id: cid })
+    } catch (error) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(500).json({ error: `Error al buscar carrito`, message: error.message });
     }
 
-    if (!producto) {
-        return res.status(404).json({ error: `No existe el producto con id ${pid}` });
+    if (!existeCarrito) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(400).json({ error: `No existe carrito con id ${cid}` });
     }
 
-    // si ya existe un producto entonces sumarle 1 a la cantidad
-    let existe = carrito.productos.find(producto => producto.id === pid);
-    if (existe) {
-        existe.quantity++;
-        saveProducts(carritos);
-        return res.status(201).json({ existe });        
+    let existeProducto
+    try {
+        existeProducto = await productsModelo.findOne({ deleted: false, _id: pid })
+    } catch (error) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(500).json({ error: `Error al buscar producto`, message: error.message });
     }
 
-    let nuevoProducto = {
-        id: producto.id,       
-        quantity: 1
-    };
+    if (!existeProducto) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(400).json({ error: `No existe producto con id ${pid}` });
+    }
 
-    carrito.productos.push(nuevoProducto);
-    saveProducts(carritos);
+    //    si los ID son correctos, entonces agregar el producto al carrito
 
-    res.setHeader('Content-Type', 'application/json');
-    return res.status(201).json({ nuevoProducto });
+    let resultado
+    try {
+        resultado = await cartsModelo.updateOne({ deleted: false, _id: cid }, { $push: { products : pid} })
+        console.log(resultado)
+
+        if (resultado.modifiedCount > 0) {
+            res.setHeader('Content-Type', 'application/json');
+            return res.status(200).json({ payload: "modificación realizada" });
+
+        } else {
+            res.setHeader('Content-Type', 'application/json');
+            return res.status(200).json({ message: "No se modificó ningún producto" });
+        }
+
+    } catch (error) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(500).json({ error: `Error inesperado`, message: error.message });
+    }
 })
 
 
