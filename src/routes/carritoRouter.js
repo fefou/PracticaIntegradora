@@ -18,7 +18,7 @@ import { productsModelo } from '../dao/models/products.model.js'
 routerC.get('/', async (req, res) => {
     let carritos = []
     try {
-        carritos = await cartsModelo.find({ deleted: false }).populate('products.products').lean()
+        carritos = await cartsModelo.find({ deleted: false }).populate('products.product').lean()
     } catch (error) {
         console.log(error.message)
     }
@@ -36,7 +36,7 @@ routerC.get('/:cid', async (req, res) => {
     let existe
 
     try {
-        existe = await cartsModelo.findOne({ deleted: false, _id: cid }).populate('products.products').lean()
+        existe = await cartsModelo.findOne({ deleted: false, _id: cid }).populate('products.product').lean()
 
     } catch (error) {
         res.setHeader('Content-Type', 'application/json');
@@ -111,9 +111,15 @@ routerC.put('/:cid/products/:pid', async (req, res) => {
     //    si los ID son correctos, entonces agregar el producto al carrito
 
     let resultado
+    let indice=existeCarrito.products.findIndex(p=>p.product==existeProducto._id.toString())
+    if (indice===-1){
+        existeCarrito.products.push({product:existeProducto._id, quantity:1})
+    }else{
+        existeCarrito.products[indice].quantity++;
+    }
 
     try {
-        resultado = await cartsModelo.updateOne({ deleted: false, _id: cid }, { $push: { products: existeProducto } })
+        resultado = await cartsModelo.updateOne({ deleted: false, _id: cid }, existeCarrito)
 
         if (resultado.modifiedCount > 0) {
             res.setHeader('Content-Type', 'application/json');
@@ -127,7 +133,7 @@ routerC.put('/:cid/products/:pid', async (req, res) => {
     } catch (error) {
         res.setHeader('Content-Type', 'application/json');
         return res.status(500).json({ error: `Error inesperado`, message: error.message });
-    }
+    }   
 })
 
 

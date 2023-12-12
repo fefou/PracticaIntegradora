@@ -3,8 +3,10 @@ const cartsEsquema = new mongoose.Schema({
 
     products: [
         {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "products",
+            product:{
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "products",                
+            },
             quantity: Number
         }
     ],
