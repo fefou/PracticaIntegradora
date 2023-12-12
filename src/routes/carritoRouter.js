@@ -9,21 +9,20 @@ let ruta = path.join(__dirname, '..', 'json', 'carritos.json')
 import mongoose from 'mongoose'
 import { cartsModelo } from '../dao/models/carts.model.js'
 import { productsModelo } from '../dao/models/products.model.js'
-function saveProducts(carritos) {
-    fs.writeFileSync(ruta, JSON.stringify(carritos, null, 5))
-}
+// function saveProducts(carritos) {
+//     fs.writeFileSync(ruta, JSON.stringify(carritos, null, 5))
+// }
 
 // GET CARRITO
 
 routerC.get('/', async (req, res) => {
     let carritos = []
     try {
-        carritos = await cartsModelo.find({ deleted: false }).populate('products.products')
+        carritos = await cartsModelo.find({ deleted: false }).populate('products.products').lean()
     } catch (error) {
         console.log(error.message)
     }
     res.status(200).json({ carritos });
-
 });
 
 routerC.get('/:cid', async (req, res) => {
@@ -35,8 +34,10 @@ routerC.get('/:cid', async (req, res) => {
     }
 
     let existe
+
     try {
-        existe = await cartsModelo.findOne({ deleted: false, _id: cid })
+        existe = await cartsModelo.findOne({ deleted: false, _id: cid }).populate('products.products').lean()
+
     } catch (error) {
         res.setHeader('Content-Type', 'application/json');
         return res.status(500).json({ error: `Error al buscar carrito`, message: error.message });
@@ -49,6 +50,7 @@ routerC.get('/:cid', async (req, res) => {
 
     res.setHeader('Content-Type', 'application/json');
     return res.status(200).json({ carrito: existe });
+
 })
 
 // POST CARRITO VACÍO con id
@@ -58,6 +60,7 @@ routerC.post('/', async (req, res) => {
 
     try {
         carrito = await cartsModelo.create({ productsModelo: [] })
+
     } catch (error) {
         console.log("no se pudo crear un carrito", error.message)
     }
@@ -108,9 +111,9 @@ routerC.put('/:cid/products/:pid', async (req, res) => {
     //    si los ID son correctos, entonces agregar el producto al carrito
 
     let resultado
+
     try {
-        resultado = await cartsModelo.updateOne({ deleted: false, _id: cid }, { $push: { products : pid} })
-        console.log(resultado)
+        resultado = await cartsModelo.updateOne({ deleted: false, _id: cid }, { $push: { products: existeProducto } })
 
         if (resultado.modifiedCount > 0) {
             res.setHeader('Content-Type', 'application/json');
@@ -127,9 +130,5 @@ routerC.put('/:cid/products/:pid', async (req, res) => {
     }
 })
 
-
-
-
-// module.exports = routerC
 
 export default routerC
