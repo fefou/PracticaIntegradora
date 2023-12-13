@@ -9,6 +9,7 @@ import __dirname from './utils.js'
 import path from 'path'
 import pm from './manager/productManager.js'
 import mongoose from 'mongoose'
+import { messagesModelo } from './dao/models/messages.model.js'
 
 const productos=pm.getProducts()
 const app = express()
@@ -46,22 +47,24 @@ serverSockets.on("connection",socket=>{
     console.log(`se conecto un cliente con id ${socket.id}`)
 
 
-    socket.on('id', nombre=>{
+    socket.on('id', email=>{
 
-        usuarios.push({nombre, id:socket.id})
-        socket.broadcast.emit('nuevoUsuario', nombre)
+        usuarios.push({email, id:socket.id})
+        socket.broadcast.emit('nuevoUsuario', email)
         socket.emit("Hola", mensajes)
     })
 
     socket.on('mensaje',datos=>{
         mensajes.push(datos)
         serverSockets.emit('nuevoMensaje', datos)
+
+        messagesModelo.create({user:datos.emisor, message:datos.mensaje})
     })
 
     socket.on("disconnect",()=>{
         let usuario=usuarios.find(u=>u.id===socket.id)
         if(usuario){
-            serverSockets.emit('usuarioDesconectado', usuario.nombre)
+            serverSockets.emit('usuarioDesconectado', usuario.email)
         }
     })
 })

@@ -7,9 +7,9 @@ let divMensajes = document.getElementById('mensajes')
 Swal.fire({
     title: "Identifiquese",
     input: "text",
-    text: "ingrese su nombre",
+    text: "ingrese su email",
     inputValidator: (value) => {
-        return !value && 'debe ingresar un nombre'
+        return !value && 'debe ingresar un email'
     },
     allowOutsideClick: false,
 
@@ -18,10 +18,10 @@ Swal.fire({
     socket.emit('id', resultado.value)
     inputMensaje.focus()
     document.title = resultado.value
-    socket.on('nuevoUsuario', nombre => {
+    socket.on('nuevoUsuario', email => {
         // POPUP  CON AVISO
         Swal.fire({
-            text: `Se ha conectado ${nombre}`,
+            text: `Se ha conectado ${email}`,
             toast: true,
             position: 'top-right'
         })
@@ -39,9 +39,9 @@ Swal.fire({
 
     })
 
-    socket.on('usuarioDesconectado', nombre => {
+    socket.on('usuarioDesconectado', email => {
         Swal.fire({
-            text: `Se ha desconectado ${nombre}`,
+            text: `Se ha desconectado ${email}`,
             toast: true,
             position: 'top-right'
         })
